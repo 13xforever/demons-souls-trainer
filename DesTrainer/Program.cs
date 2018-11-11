@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Buffers;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using BitConverter;
 
@@ -14,6 +16,8 @@ namespace DesTrainer
 
         static void Main(string[] args)
         {
+            AdjustPriveleges();
+
             do
             {
                 Console.Title = "Demon's Souls Trainer";
@@ -56,6 +60,13 @@ namespace DesTrainer
                                     Console.Write($"HP {hp} / MP {mp} / ST {st}            ");
                                 }
                             }
+                            else
+                            {
+                                var error = Marshal.GetLastWin32Error();
+                                var msg = new Win32Exception(error).Message;
+                                Console.CursorLeft = 0;
+                                Console.Write(msg);
+                            }
                             Thread.Sleep(50);
                         } while (!des.HasExited);
                     }
@@ -63,6 +74,26 @@ namespace DesTrainer
                 else
                     Thread.Sleep(100);
             } while (true);
+        }
+
+        private static void AdjustPriveleges()
+        {
+            try
+            {
+                bool retVal;
+                TOKEN_PRIVILEGES tp;
+                var hproc = Kernel32.GetCurrentProcess();
+                var htok = IntPtr.Zero;
+                Advapi32.OpenProcessToken(hproc, TokenPriveleges.TOKEN_ADJUST_PRIVILEGES | TokenPriveleges.TOKEN_QUERY, ref htok);
+                tp.PrivilegeCount = 1;
+                tp.Luid = new LUID();
+                tp.Attributes = Advapi32.SE_PRIVILEGE_ENABLED;
+                retVal = Advapi32.AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
         }
     }
 }
