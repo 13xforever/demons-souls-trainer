@@ -9,7 +9,7 @@ namespace DesTrainer
         public static extern bool OpenProcessToken(IntPtr h, TokenPriveleges acc, ref IntPtr phtok);
 
         [DllImport("advapi32.dll", SetLastError = true)]
-        public static extern bool LookupPrivilegeValue(string host, string name, ref long pluid);
+        public static extern bool LookupPrivilegeValue(string host, string name, ref LUID pluid);
 
         // Use this signature if you want the previous state information returned
         [DllImport("advapi32.dll", SetLastError = true)]
@@ -53,43 +53,43 @@ namespace DesTrainer
                             TOKEN_ADJUST_SESSIONID),
     }
 
-    public enum SecurityEntity
+    public static class SecurityEntity
     {
-        SE_CREATE_TOKEN_NAME,
-        SE_ASSIGNPRIMARYTOKEN_NAME,
-        SE_LOCK_MEMORY_NAME,
-        SE_INCREASE_QUOTA_NAME,
-        SE_UNSOLICITED_INPUT_NAME,
-        SE_MACHINE_ACCOUNT_NAME,
-        SE_TCB_NAME,
-        SE_SECURITY_NAME,
-        SE_TAKE_OWNERSHIP_NAME,
-        SE_LOAD_DRIVER_NAME,
-        SE_SYSTEM_PROFILE_NAME,
-        SE_SYSTEMTIME_NAME,
-        SE_PROF_SINGLE_PROCESS_NAME,
-        SE_INC_BASE_PRIORITY_NAME,
-        SE_CREATE_PAGEFILE_NAME,
-        SE_CREATE_PERMANENT_NAME,
-        SE_BACKUP_NAME,
-        SE_RESTORE_NAME,
-        SE_SHUTDOWN_NAME,
-        SE_DEBUG_NAME,
-        SE_AUDIT_NAME,
-        SE_SYSTEM_ENVIRONMENT_NAME,
-        SE_CHANGE_NOTIFY_NAME,
-        SE_REMOTE_SHUTDOWN_NAME,
-        SE_UNDOCK_NAME,
-        SE_SYNC_AGENT_NAME,
-        SE_ENABLE_DELEGATION_NAME,
-        SE_MANAGE_VOLUME_NAME,
-        SE_IMPERSONATE_NAME,
-        SE_CREATE_GLOBAL_NAME,
-        SE_CREATE_SYMBOLIC_LINK_NAME,
-        SE_INC_WORKING_SET_NAME,
-        SE_RELABEL_NAME,
-        SE_TIME_ZONE_NAME,
-        SE_TRUSTED_CREDMAN_ACCESS_NAME
+        public const string SE_ASSIGNPRIMARYTOKEN_NAME = "SeAssignPrimaryTokenPrivilege";
+        public const string SE_AUDIT_NAME = "SeAuditPrivilege";
+        public const string SE_BACKUP_NAME = "SeBackupPrivilege";
+        public const string SE_CHANGE_NOTIFY_NAME = "SeChangeNotifyPrivilege";
+        public const string SE_CREATE_GLOBAL_NAME = "SeCreateGlobalPrivilege";
+        public const string SE_CREATE_PAGEFILE_NAME = "SeCreatePagefilePrivilege";
+        public const string SE_CREATE_PERMANENT_NAME = "SeCreatePermanentPrivilege";
+        public const string SE_CREATE_SYMBOLIC_LINK_NAME = "SeCreateSymbolicLinkPrivilege";
+        public const string SE_CREATE_TOKEN_NAME = "SeCreateTokenPrivilege";
+        public const string SE_DEBUG_NAME = "SeDebugPrivilege";
+        public const string SE_ENABLE_DELEGATION_NAME = "SeEnableDelegationPrivilege";
+        public const string SE_IMPERSONATE_NAME = "SeImpersonatePrivilege";
+        public const string SE_INC_BASE_PRIORITY_NAME = "SeIncreaseBasePriorityPrivilege";
+        public const string SE_INCREASE_QUOTA_NAME = "SeIncreaseQuotaPrivilege";
+        public const string SE_INC_WORKING_SET_NAME = "SeIncreaseWorkingSetPrivilege";
+        public const string SE_LOAD_DRIVER_NAME = "SeLoadDriverPrivilege";
+        public const string SE_LOCK_MEMORY_NAME = "SeLockMemoryPrivilege";
+        public const string SE_MACHINE_ACCOUNT_NAME = "SeMachineAccountPrivilege";
+        public const string SE_MANAGE_VOLUME_NAME = "SeManageVolumePrivilege";
+        public const string SE_PROF_SINGLE_PROCESS_NAME = "SeProfileSingleProcessPrivilege";
+        public const string SE_RELABEL_NAME = "SeRelabelPrivilege";
+        public const string SE_REMOTE_SHUTDOWN_NAME = "SeRemoteShutdownPrivilege";
+        public const string SE_RESTORE_NAME = "SeRestorePrivilege";
+        public const string SE_SECURITY_NAME = "SeSecurityPrivilege";
+        public const string SE_SHUTDOWN_NAME = "SeShutdownPrivilege";
+        public const string SE_SYNC_AGENT_NAME = "SeSyncAgentPrivilege";
+        public const string SE_SYSTEM_ENVIRONMENT_NAME = "SeSystemEnvironmentPrivilege";
+        public const string SE_SYSTEM_PROFILE_NAME = "SeSystemProfilePrivilege";
+        public const string SE_SYSTEMTIME_NAME = "SeSystemtimePrivilege";
+        public const string SE_TAKE_OWNERSHIP_NAME = "SeTakeOwnershipPrivilege";
+        public const string SE_TCB_NAME = "SeTcbPrivilege";
+        public const string SE_TIME_ZONE_NAME = "SeTimeZonePrivilege";
+        public const string SE_TRUSTED_CREDMAN_ACCESS_NAME = "SeTrustedCredManAccessPrivilege";
+        public const string SE_UNDOCK_NAME = "SeUndockPrivilege";
+        public const string SE_UNSOLICITED_INPUT_NAME = "SeUnsolicitedInputPrivilege";
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]

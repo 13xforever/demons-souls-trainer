@@ -16,7 +16,7 @@ namespace DesTrainer
 
         static void Main(string[] args)
         {
-            AdjustPriveleges();
+            AdjustPrivileges();
 
             do
             {
@@ -76,11 +76,10 @@ namespace DesTrainer
             } while (true);
         }
 
-        private static void AdjustPriveleges()
+        private static void AdjustPrivileges()
         {
             try
             {
-                bool retVal;
                 TOKEN_PRIVILEGES tp;
                 var hproc = Kernel32.GetCurrentProcess();
                 var htok = IntPtr.Zero;
@@ -88,7 +87,10 @@ namespace DesTrainer
                 tp.PrivilegeCount = 1;
                 tp.Luid = new LUID();
                 tp.Attributes = Advapi32.SE_PRIVILEGE_ENABLED;
-                retVal = Advapi32.AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                if (!Advapi32.LookupPrivilegeValue(null, SecurityEntity.SE_DEBUG_NAME, ref tp.Luid))
+                    throw new UnauthorizedAccessException();
+
+                Advapi32.AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
             }
             catch (Exception ex)
             {
