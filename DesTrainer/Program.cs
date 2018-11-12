@@ -34,9 +34,9 @@ namespace DesTrainer
                     using (var pmr = ProcessMemoryReader.OpenProcess(des))
                     {
 
-                        const ulong rpcs3Base = 0x1_0000_0000;
+                        var rpcs3Base = pmr.GetMemoryRegions().First(r => r.offset >= 0x1_0000_0000 && (r.offset % 0x1_0000_0000 == 0)).offset; // should be either 0x1_0000_0000 or 0x3_0000_0000
                         const int offsetHp = 0x3c4;
-                        var pBase = (IntPtr)0x101B4A5EC;
+                        var pBase = (IntPtr)(rpcs3Base + 0x1B4A5EC);
                         do
                         {
                             var ptrBuf = ArrayPool.Rent(4);
