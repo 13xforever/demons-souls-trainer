@@ -74,11 +74,11 @@ namespace DesTrainer
                                         name += " ";
 
                                     pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
-                                    var souls = readBytes == 4 ? EndianBitConverter.BigEndian.ToInt32(ptrBuf, 0).ToString() : "";
+                                    var souls = rpcs3Base == 0x1_0000_0000 && readBytes == 4 ? EndianBitConverter.BigEndian.ToInt32(ptrBuf, 0).ToString() : "";
 
                                     var hp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 0);
                                     var mp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 8);
-                                    var st = EndianBitConverter.BigEndian.ToUInt32(valBuf, 12);
+                                    var st = EndianBitConverter.BigEndian.ToUInt32(valBuf, 16);
                                     Console.CursorLeft = 0;
                                     Console.Write(name);
                                     Console.ForegroundColor = ConsoleColor.Red;
