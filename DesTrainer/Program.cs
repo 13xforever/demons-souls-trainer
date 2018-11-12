@@ -20,7 +20,7 @@ namespace DesTrainer
             AdjustPrivileges();
 
             Console.Clear();
-            Console.WindowWidth = 60;
+            Console.WindowWidth = 50;
             Console.WindowHeight = 5;
             Console.BufferWidth = Console.WindowWidth;
             Console.BufferHeight = Console.WindowHeight;
@@ -62,35 +62,39 @@ namespace DesTrainer
                                 pmr.ReadProcessMemory(ptr, valueLength, valBuf, out readBytes);
                                 if (readBytes == valueLength)
                                 {
-                                    Buffer.BlockCopy(valBuf, 4, valBuf, 0, 4);
-                                    Buffer.BlockCopy(valBuf, 12, valBuf, 8, 4);
-                                    Buffer.BlockCopy(valBuf, 20, valBuf, 16, 4);
-                                    pmr.WriteProcessMemory(ptr, valBuf, out _);
-                                    pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
+                                    var hp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 4);
+                                    var mp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 12);
+                                    var st = EndianBitConverter.BigEndian.ToUInt32(valBuf, 20);
+                                    if (hp < 9999 && mp < 9999 & st < 9999)
+                                    {
+                                        Buffer.BlockCopy(valBuf, 4, valBuf, 0, 4);
+                                        Buffer.BlockCopy(valBuf, 12, valBuf, 8, 4);
+                                        Buffer.BlockCopy(valBuf, 20, valBuf, 16, 4);
+                                        pmr.WriteProcessMemory(ptr, valBuf, out _);
+                                        pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
 
-                                    var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf, 0, readBytes / 2) : "";
-                                    name = name.TrimEnd('\0', ' ');
-                                    if (!string.IsNullOrEmpty(name))
-                                        name += " ";
+                                        var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf, 0, readBytes / 2) : "";
+                                        name = name.TrimEnd('\0', ' ');
+                                        if (!string.IsNullOrEmpty(name))
+                                            name += " ";
 
-                                    pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
-                                    var souls = rpcs3Base == 0x1_0000_0000 && readBytes == 4 ? EndianBitConverter.BigEndian.ToInt32(ptrBuf, 0).ToString() : "";
+                                        pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
+                                        var souls = rpcs3Base == 0x1_0000_0000 && readBytes == 4 ? EndianBitConverter.BigEndian.ToInt32(ptrBuf, 0).ToString() : "";
 
-                                    var hp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 0);
-                                    var mp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 8);
-                                    var st = EndianBitConverter.BigEndian.ToUInt32(valBuf, 16);
-                                    Console.CursorLeft = 0;
-                                    Console.Write(name);
-                                    Console.ForegroundColor = ConsoleColor.Red;
-                                    Console.Write($"{hp} ");
-                                    Console.ForegroundColor = ConsoleColor.Blue;
-                                    Console.Write($"{mp} ");
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write($"{st} ");
-                                    Console.ResetColor();
-                                    Console.Write($"{souls}       ");
+                                        Console.CursorLeft = 0;
+                                        Console.Write(name);
+                                        Console.ForegroundColor = ConsoleColor.Red;
+                                        Console.Write($"{hp} ");
+                                        Console.ForegroundColor = ConsoleColor.Blue;
+                                        Console.Write($"{mp} ");
+                                        Console.ForegroundColor = ConsoleColor.Green;
+                                        Console.Write($"{st} ");
+                                        Console.ResetColor();
+                                        Console.Write($"{souls}       ");
+                                    }
                                 }
                             }
+#if DEBUG
                             else
                             {
                                 var error = Marshal.GetLastWin32Error();
@@ -98,6 +102,7 @@ namespace DesTrainer
                                 Console.CursorLeft = 0;
                                 Console.Write(msg);
                             }
+#endif
                             Thread.Sleep(100);
                         } while (!des.HasExited);
                     }
