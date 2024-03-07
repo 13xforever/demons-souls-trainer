@@ -4,13 +4,18 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.Security;
 using BitConverter;
 
 namespace DesTrainer;
 
-static class Program
+[SupportedOSPlatform("windows6.0")]
+static unsafe class Program
 {
     const int valueLength = 2*3*4;
     private static readonly ArrayPool<byte> ArrayPool = ArrayPool<byte>.Create(valueLength, 64);
@@ -73,7 +78,7 @@ static class Program
                                     pmr.WriteProcessMemory(ptr, valBuf, out _);
                                     pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
 
-                                    var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf, 0, readBytes / 2) : "";
+                                    var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf, 0, (int)(readBytes / 2)) : "";
                                     name = name.TrimEnd('\0', ' ');
                                     if (!string.IsNullOrEmpty(name))
                                         name += " ";
@@ -121,17 +126,24 @@ static class Program
     {
         try
         {
-            TOKEN_PRIVILEGES tp;
-            var hproc = Kernel32.GetCurrentProcess();
-            var htok = IntPtr.Zero;
-            Advapi32.OpenProcessToken(hproc, TokenPriveleges.TOKEN_ADJUST_PRIVILEGES | TokenPriveleges.TOKEN_QUERY, ref htok);
-            tp.PrivilegeCount = 1;
-            tp.Luid = new();
-            tp.Attributes = Advapi32.SE_PRIVILEGE_ENABLED;
-            if (!Advapi32.LookupPrivilegeValue(null, SecurityEntity.SE_DEBUG_NAME, ref tp.Luid))
+            var hproc = Process.GetCurrentProcess().SafeHandle;
+            PInvoke.OpenProcessToken(hproc, TOKEN_ACCESS_MASK.TOKEN_ADJUST_PRIVILEGES | TOKEN_ACCESS_MASK.TOKEN_QUERY, out var htok);
+            if (!PInvoke.LookupPrivilegeValue(null, PInvoke.SE_DEBUG_NAME, out var luid))
                 throw new UnauthorizedAccessException();
 
-            Advapi32.AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+            TOKEN_PRIVILEGES tp = new()
+            {
+                PrivilegeCount = 1,
+                Privileges = new()
+                {
+                    _0 = new()
+                    {
+                        Luid = luid,
+                        Attributes = TOKEN_PRIVILEGES_ATTRIBUTES.SE_PRIVILEGE_ENABLED,
+                    }
+                }
+            };
+            PInvoke.AdjustTokenPrivileges(htok, false, tp, 0, default, default);
         }
         catch (Exception ex)
         {
