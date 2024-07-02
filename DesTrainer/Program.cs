@@ -43,15 +43,19 @@ static unsafe class Program
             {
                 var des = procList[0];
                 Console.Clear();
+#if DEBUG                
                 Console.WriteLine($"Opened process {des.Id}: {des.MainModule.ModuleName}");
+#endif
                 Console.Title += " (Active)";
                 Console.CursorVisible = false;
                 using var pmr = ProcessMemoryReader.OpenProcess(des);
                 var rpcs3Base = pmr.GetMemoryRegions().First(r => r.offset >= 0x1_0000_0000 && (r.offset % 0x1000_0000 == 0)).offset; // should be either 0x1_0000_0000 or 0x3_0000_0000
+#if DEBUG                
                 Console.WriteLine($"Guest memory base: 0x{rpcs3Base:x8}");
+#endif
                 const int statsPointer  = 0x01B4A5EC; // 4
-                const int characterName = 0x202E80B0; // 16*2
-                const int currentSouls  = 0x202E8098; // 4
+                const int currentSouls  = 0x301E8098; //0x202E8098; // 4
+                const int characterName = currentSouls+0x18; //0x202E80B0; // 16*2
                 const int offsetHp = 0x3c4;
                 var pBase = (IntPtr)(rpcs3Base + statsPointer);
                 do
@@ -73,27 +77,28 @@ static unsafe class Program
                                 valBuf[12..16].CopyTo(valBuf[8..12]);
                                 valBuf[20..24].CopyTo(valBuf[16..20]);
                                 pmr.WriteProcessMemory(ptr, valBuf, out _);
-                                pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
 
+                                pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
+                                var souls = rpcs3Base == 0x3_0000_0000 && readBytes == 4
+                                    ? BinaryPrimitives.ReadInt32BigEndian(ptrBuf).ToString()
+                                    : "";
+
+                                pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
                                 var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf[..(int)readBytes]) : "";
                                 name = name.TrimEnd('\0', ' ');
                                 if (!string.IsNullOrEmpty(name))
                                     name += " ";
-
-                                pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
-                                var souls = rpcs3Base == 0x1_0000_0000 && readBytes == 4
-                                    ? BinaryPrimitives.ReadInt32BigEndian(ptrBuf).ToString()
-                                    : "";
+                                
                                 Console.CursorLeft = 0;
                                 Console.Write(name);
                                 Console.ForegroundColor = ConsoleColor.Red;
-                                Console.Write($"{hp} ");
+                                Console.Write($"❤️{hp} ");
                                 Console.ForegroundColor = ConsoleColor.Blue;
-                                Console.Write($"{mp} ");
+                                Console.Write($"🔵{mp} ");
                                 Console.ForegroundColor = ConsoleColor.Green;
-                                Console.Write($"{st} ");
+                                Console.Write($"🟩{st} ");
                                 Console.ResetColor();
-                                Console.Write($"{souls}       ");
+                                Console.Write($"👻{souls}       ");
                             }
                         }
                     }
