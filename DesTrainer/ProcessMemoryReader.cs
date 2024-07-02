@@ -26,21 +26,21 @@ public unsafe class ProcessMemoryReader: IDisposable
             )
         };
 
-    public void ReadProcessMemory(IntPtr address, uint bytesToRead, byte[] buffer, out uint bytesRead)
+    public void ReadProcessMemory(IntPtr address, uint bytesToRead, Span<byte> buffer, out uint bytesRead)
     {
         var changedProtection = PInvoke.VirtualProtectEx(procHandle, (void*)address, bytesToRead, PAGE_PROTECTION_FLAGS.PAGE_EXECUTE_READWRITE, out var originalProtection);
         UIntPtr lpBytesRead = default;
-        fixed (void* lpBuffer = &buffer[0])
+        fixed (void* lpBuffer = buffer)
             PInvoke.ReadProcessMemory(procHandle, (void*)address, lpBuffer, bytesToRead, &lpBytesRead);
         if (changedProtection)
             PInvoke.VirtualProtectEx(procHandle, (void*)address, bytesToRead, originalProtection, out _);
         bytesRead = lpBytesRead.ToUInt32();
     }
 
-    public void WriteProcessMemory(IntPtr address, byte[] bytesToWrite, out uint bytesWritten)
+    public void WriteProcessMemory(IntPtr address, Span<byte> bytesToWrite, out uint bytesWritten)
     {
         UIntPtr lpBytesWritten = default;
-        fixed (void* lpBytesToWrite = &bytesToWrite[0])
+        fixed (void* lpBytesToWrite = bytesToWrite)
             PInvoke.WriteProcessMemory(procHandle, (void*)address, lpBytesToWrite, (uint)bytesToWrite.Length, &lpBytesWritten);
         bytesWritten = lpBytesWritten.ToUInt32();
     }
