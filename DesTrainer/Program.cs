@@ -17,6 +17,7 @@ namespace DesTrainer;
 static unsafe class Program
 {
     const int ValueLength = 2*3*4;
+    const char ESC = '\u001B';
 
     static void Main(string[] args)
     {
@@ -44,12 +45,14 @@ static unsafe class Program
                 var des = procList[0];
                 Console.Clear();
 #if DEBUG                
-                Console.WriteLine($"Opened process {des.Id}: {des.MainModule.ModuleName}");
+                Console.WriteLine($"Opened process {des.Id}: {des.MainModule!.ModuleName}");
 #endif
                 Console.Title += " (Active)";
                 Console.CursorVisible = false;
                 using var pmr = ProcessMemoryReader.OpenProcess(des);
-                var rpcs3Base = pmr.GetMemoryRegions().First(r => r.offset >= 0x1_0000_0000 && (r.offset % 0x1000_0000 == 0)).offset; // should be either 0x1_0000_0000 or 0x3_0000_0000
+                var rpcs3Base = pmr.GetMemoryRegions()
+                    .First(r => r.offset >= 0x1_0000_0000 && r.offset % 0x1000_0000 is 0)
+                    .offset; // should be either 0x1_0000_0000 or 0x3_0000_0000
 #if DEBUG                
                 Console.WriteLine($"Guest memory base: 0x{rpcs3Base:x8}");
 #endif
@@ -89,16 +92,7 @@ static unsafe class Program
                                 if (!string.IsNullOrEmpty(name))
                                     name += " ";
                                 
-                                Console.CursorLeft = 0;
-                                Console.Write(name);
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                Console.Write($"❤️{hp} ");
-                                Console.ForegroundColor = ConsoleColor.Blue;
-                                Console.Write($"🔵{mp} ");
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.Write($"🟩{st} ");
-                                Console.ResetColor();
-                                Console.Write($"👻{souls}       ");
+                                Console.Write($"\x1B[G{name}\x1B[91m❤️{hp} \x1B[94m🔵{mp} \x1B[92m🟩{st} \x1B[0m👻{souls}       ");
                             }
                         }
                     }
