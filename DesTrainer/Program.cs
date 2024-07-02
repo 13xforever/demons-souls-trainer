@@ -1,19 +1,22 @@
 ﻿using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
-using BitConverter;
+using Windows.Win32;
+using Windows.Win32.Security;
 
 namespace DesTrainer;
 
-static class Program
+[SupportedOSPlatform("windows6.0")]
+static unsafe class Program
 {
-    const int valueLength = 2*3*4;
-    private static readonly ArrayPool<byte> ArrayPool = ArrayPool<byte>.Create(valueLength, 64);
+    const int ValueLength = 2*3*4;
 
     static void Main(string[] args)
     {
@@ -24,6 +27,9 @@ static class Program
         Console.WindowHeight = 5;
         Console.BufferWidth = Console.WindowWidth;
         Console.BufferHeight = Console.WindowHeight;
+        Span<byte> ptrBuf = stackalloc byte[4];
+        Span<byte> valBuf = stackalloc byte[ValueLength];
+        Span<byte> nameBuf = stackalloc byte[2 * 16];
         do
         {
             Console.Title = "Demon's Souls Trainer";
@@ -31,7 +37,7 @@ static class Program
             Console.Write("Searching for the process...");
             var procList = Process.GetProcesses()
                 .Where(p => p.MainWindowTitle.Contains("Demon's Souls", StringComparison.InvariantCultureIgnoreCase)
-                            && p.MainModule.ModuleName.Contains("rpcs3", StringComparison.InvariantCultureIgnoreCase)
+                            && (p.MainModule?.ModuleName.Contains("rpcs3", StringComparison.InvariantCultureIgnoreCase) ?? false)
                 ).ToList();
             if (procList.Count == 1)
             {
@@ -40,75 +46,68 @@ static class Program
                 Console.WriteLine($"Opened process {des.Id}: {des.MainModule.ModuleName}");
                 Console.Title += " (Active)";
                 Console.CursorVisible = false;
-                var ptrBuf = ArrayPool.Rent(4);
-                var valBuf = ArrayPool.Rent(valueLength);
-                var nameBuf = ArrayPool.Rent(2*16);
-                using (var pmr = ProcessMemoryReader.OpenProcess(des))
+                using var pmr = ProcessMemoryReader.OpenProcess(des);
+                var rpcs3Base = pmr.GetMemoryRegions().First(r => r.offset >= 0x1_0000_0000 && (r.offset % 0x1000_0000 == 0)).offset; // should be either 0x1_0000_0000 or 0x3_0000_0000
+                Console.WriteLine($"Guest memory base: 0x{rpcs3Base:x8}");
+                const int statsPointer  = 0x01B4A5EC; // 4
+                const int characterName = 0x202E80B0; // 16*2
+                const int currentSouls  = 0x202E8098; // 4
+                const int offsetHp = 0x3c4;
+                var pBase = (IntPtr)(rpcs3Base + statsPointer);
+                do
                 {
-
-                    var rpcs3Base = pmr.GetMemoryRegions().First(r => r.offset >= 0x1_0000_0000 && (r.offset % 0x1000_0000 == 0)).offset; // should be either 0x1_0000_0000 or 0x3_0000_0000
-                    Console.WriteLine($"Guest memory base: 0x{rpcs3Base:x8}");
-                    const int statsPointer  = 0x01B4A5EC; // 4
-                    const int characterName = 0x202E80B0; // 16*2
-                    const int currentSouls  = 0x202E8098; // 4
-                    const int offsetHp = 0x3c4;
-                    var pBase = (IntPtr)(rpcs3Base + statsPointer);
-                    do
+                    pmr.ReadProcessMemory(pBase, 4, ptrBuf, out var readBytes);
+                    if (readBytes == 4)
                     {
-                        pmr.ReadProcessMemory(pBase, 4, ptrBuf, out var readBytes);
-                        if (readBytes == 4)
+                            
+                        var ptr = (IntPtr)(rpcs3Base + BinaryPrimitives.ReadUInt32BigEndian(ptrBuf) + offsetHp);
+                        pmr.ReadProcessMemory(ptr, ValueLength, valBuf, out readBytes);
+                        if (readBytes == ValueLength)
                         {
-                            var ptr = (IntPtr)(rpcs3Base + EndianBitConverter.BigEndian.ToUInt32(ptrBuf, 0) + offsetHp);
-                            pmr.ReadProcessMemory(ptr, valueLength, valBuf, out readBytes);
-                            if (readBytes == valueLength)
+                            var hp = BinaryPrimitives.ReadUInt32BigEndian(valBuf[4..]);
+                            var mp = BinaryPrimitives.ReadUInt32BigEndian(valBuf[12..]);
+                            var st = BinaryPrimitives.ReadUInt32BigEndian(valBuf[20..]);
+                            if (hp < 9999 && mp < 9999 & st < 9999)
                             {
-                                var hp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 4);
-                                var mp = EndianBitConverter.BigEndian.ToUInt32(valBuf, 12);
-                                var st = EndianBitConverter.BigEndian.ToUInt32(valBuf, 20);
-                                if (hp < 9999 && mp < 9999 & st < 9999)
-                                {
-                                    Buffer.BlockCopy(valBuf, 4, valBuf, 0, 4);
-                                    Buffer.BlockCopy(valBuf, 12, valBuf, 8, 4);
-                                    Buffer.BlockCopy(valBuf, 20, valBuf, 16, 4);
-                                    pmr.WriteProcessMemory(ptr, valBuf, out _);
-                                    pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
+                                valBuf[4..8].CopyTo(valBuf[0..4]);
+                                valBuf[12..16].CopyTo(valBuf[8..12]);
+                                valBuf[20..24].CopyTo(valBuf[16..20]);
+                                pmr.WriteProcessMemory(ptr, valBuf, out _);
+                                pmr.ReadProcessMemory((IntPtr)(rpcs3Base + characterName), 2 * 16, nameBuf, out readBytes);
 
-                                    var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf, 0, readBytes / 2) : "";
-                                    name = name.TrimEnd('\0', ' ');
-                                    if (!string.IsNullOrEmpty(name))
-                                        name += " ";
+                                var name = readBytes > 0 ? Encoding.BigEndianUnicode.GetString(nameBuf[..(int)readBytes]) : "";
+                                name = name.TrimEnd('\0', ' ');
+                                if (!string.IsNullOrEmpty(name))
+                                    name += " ";
 
-                                    pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
-                                    var souls = rpcs3Base == 0x1_0000_0000 && readBytes == 4 ? EndianBitConverter.BigEndian.ToInt32(ptrBuf, 0).ToString() : "";
-
-                                    Console.CursorLeft = 0;
-                                    Console.Write(name);
-                                    Console.ForegroundColor = ConsoleColor.Red;
-                                    Console.Write($"{hp} ");
-                                    Console.ForegroundColor = ConsoleColor.Blue;
-                                    Console.Write($"{mp} ");
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write($"{st} ");
-                                    Console.ResetColor();
-                                    Console.Write($"{souls}       ");
-                                }
+                                pmr.ReadProcessMemory((IntPtr)(rpcs3Base + currentSouls), 4, ptrBuf, out readBytes);
+                                var souls = rpcs3Base == 0x1_0000_0000 && readBytes == 4
+                                    ? BinaryPrimitives.ReadInt32BigEndian(ptrBuf).ToString()
+                                    : "";
+                                Console.CursorLeft = 0;
+                                Console.Write(name);
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.Write($"{hp} ");
+                                Console.ForegroundColor = ConsoleColor.Blue;
+                                Console.Write($"{mp} ");
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.Write($"{st} ");
+                                Console.ResetColor();
+                                Console.Write($"{souls}       ");
                             }
                         }
+                    }
 #if DEBUG
-                        else
-                        {
-                            var error = Marshal.GetLastWin32Error();
-                            var msg = new Win32Exception(error).Message;
-                            Console.CursorLeft = 0;
-                            Console.Write(msg);
-                        }
+                    else
+                    {
+                        var error = Marshal.GetLastWin32Error();
+                        var msg = new Win32Exception(error).Message;
+                        Console.CursorLeft = 0;
+                        Console.Write(msg);
+                    }
 #endif
-                        Thread.Sleep(100);
-                    } while (!des.HasExited);
-                }
-                ArrayPool.Return(nameBuf);
-                ArrayPool.Return(valBuf);
-                ArrayPool.Return(ptrBuf);
+                    Thread.Sleep(100);
+                } while (!des.HasExited);
                 Console.Clear();
                 Console.CursorVisible = false;
             }
@@ -121,17 +120,28 @@ static class Program
     {
         try
         {
-            TOKEN_PRIVILEGES tp;
-            var hproc = Kernel32.GetCurrentProcess();
-            var htok = IntPtr.Zero;
-            Advapi32.OpenProcessToken(hproc, TokenPriveleges.TOKEN_ADJUST_PRIVILEGES | TokenPriveleges.TOKEN_QUERY, ref htok);
-            tp.PrivilegeCount = 1;
-            tp.Luid = new();
-            tp.Attributes = Advapi32.SE_PRIVILEGE_ENABLED;
-            if (!Advapi32.LookupPrivilegeValue(null, SecurityEntity.SE_DEBUG_NAME, ref tp.Luid))
+            var hproc = Process.GetCurrentProcess().SafeHandle;
+            PInvoke.OpenProcessToken(
+                hproc,
+                TOKEN_ACCESS_MASK.TOKEN_ADJUST_PRIVILEGES | TOKEN_ACCESS_MASK.TOKEN_QUERY,
+                out var htok
+            );
+            if (!PInvoke.LookupPrivilegeValue(null, PInvoke.SE_DEBUG_NAME, out var luid))
                 throw new UnauthorizedAccessException();
 
-            Advapi32.AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+            TOKEN_PRIVILEGES tp = new()
+            {
+                PrivilegeCount = 1,
+                Privileges = new()
+                {
+                    _0 = new()
+                    {
+                        Luid = luid,
+                        Attributes = TOKEN_PRIVILEGES_ATTRIBUTES.SE_PRIVILEGE_ENABLED,
+                    }
+                }
+            };
+            PInvoke.AdjustTokenPrivileges(htok, false, tp, 0, default, default);
         }
         catch (Exception ex)
         {

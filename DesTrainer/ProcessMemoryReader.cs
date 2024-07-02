@@ -2,45 +2,58 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using Windows.Win32;
+using Windows.Win32.System.Memory;
+using Windows.Win32.System.Threading;
 
 namespace DesTrainer;
 
-public class ProcessMemoryReader: IDisposable
+[SupportedOSPlatform("windows6.0")]
+public unsafe class ProcessMemoryReader: IDisposable
 {
-    private IntPtr procHandle = IntPtr.Zero;
+    private SafeHandle procHandle;
 
     public static ProcessMemoryReader OpenProcess(Process process)
-    {
-        var access = ProcessAccessType.PROCESS_VM_READ |
-                     ProcessAccessType.PROCESS_VM_WRITE |
-                     ProcessAccessType.PROCESS_VM_OPERATION;
-        return new() { procHandle = Kernel32.OpenProcess((uint)access, 1, (uint)process.Id) };
-    }
+        => new()
+        {
+            procHandle = PInvoke.OpenProcess_SafeHandle(
+                PROCESS_ACCESS_RIGHTS.PROCESS_VM_OPERATION
+                | PROCESS_ACCESS_RIGHTS.PROCESS_VM_READ
+                | PROCESS_ACCESS_RIGHTS.PROCESS_VM_WRITE,
+                true,
+                (uint)process.Id
+            )
+        };
 
-    public void ReadProcessMemory(IntPtr address, uint bytesToRead, byte[] buffer, out int bytesRead)
+    public void ReadProcessMemory(IntPtr address, uint bytesToRead, Span<byte> buffer, out uint bytesRead)
     {
-        var changedProtection = Kernel32.VirtualProtectEx(procHandle, address, (UIntPtr)bytesToRead, MemoryProtection.PAGE_EXECUTE_READWRITE, out var originalProtection);
-        Kernel32.ReadProcessMemory(procHandle, address, buffer, bytesToRead, out var ptrBytesRead);
+        var changedProtection = PInvoke.VirtualProtectEx(procHandle, (void*)address, bytesToRead, PAGE_PROTECTION_FLAGS.PAGE_EXECUTE_READWRITE, out var originalProtection);
+        UIntPtr lpBytesRead = default;
+        fixed (void* lpBuffer = buffer)
+            PInvoke.ReadProcessMemory(procHandle, (void*)address, lpBuffer, bytesToRead, &lpBytesRead);
         if (changedProtection)
-            Kernel32.VirtualProtectEx(procHandle, address, (UIntPtr)bytesToRead, originalProtection, out _);
-        bytesRead = ptrBytesRead.ToInt32();
+            PInvoke.VirtualProtectEx(procHandle, (void*)address, bytesToRead, originalProtection, out _);
+        bytesRead = lpBytesRead.ToUInt32();
     }
 
-    public void WriteProcessMemory(IntPtr address, byte[] bytesToWrite, out int bytesWritten)
+    public void WriteProcessMemory(IntPtr address, Span<byte> bytesToWrite, out uint bytesWritten)
     {
-        Kernel32.WriteProcessMemory(procHandle, address, bytesToWrite, (uint)bytesToWrite.Length, out var ptrBytesWritten);
-        bytesWritten = ptrBytesWritten.ToInt32();
+        UIntPtr lpBytesWritten = default;
+        fixed (void* lpBytesToWrite = bytesToWrite)
+            PInvoke.WriteProcessMemory(procHandle, (void*)address, lpBytesToWrite, (uint)bytesToWrite.Length, &lpBytesWritten);
+        bytesWritten = lpBytesWritten.ToUInt32();
     }
 
     public List<(ulong offset, ulong length)> GetMemoryRegions()
     {
         var result = new List<(ulong offset, ulong length)>();
         var regions = new HashSet<(ulong offset, ulong length)>();
-        int queryResult;
+        UIntPtr queryResult;
         ulong offset = 0;
         do
         {
-            queryResult = Kernel32.VirtualQueryEx(procHandle, (IntPtr)offset, out var memInfo, (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION)));
+            queryResult = PInvoke.VirtualQueryEx(procHandle, (void*)offset, out var memInfo, (UIntPtr)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION)));
             var allocationBase = (ulong)memInfo.AllocationBase;
             var baseAddress = (ulong)memInfo.BaseAddress;
             var regionSize = (ulong)memInfo.RegionSize;
@@ -64,7 +77,6 @@ public class ProcessMemoryReader: IDisposable
 
     public void Dispose()
     {
-        if (procHandle != IntPtr.Zero)
-            Kernel32.CloseHandle(procHandle);
+        procHandle?.Dispose();
     }
 }
