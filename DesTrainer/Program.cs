@@ -30,8 +30,8 @@ static class Program
             Console.CursorLeft = 0;
             Console.Write("Searching for the process...");
             var procList = Process.GetProcesses()
-                .Where(p => p.MainWindowTitle.Contains("Demon's Souls", StringComparison.InvariantCultureIgnoreCase) &&
-                            p.MainModule.ModuleName.Contains("rpcs3", StringComparison.InvariantCultureIgnoreCase)
+                .Where(p => p.MainWindowTitle.Contains("Demon's Souls", StringComparison.InvariantCultureIgnoreCase)
+                            && p.MainModule.ModuleName.Contains("rpcs3", StringComparison.InvariantCultureIgnoreCase)
                 ).ToList();
             if (procList.Count == 1)
             {
