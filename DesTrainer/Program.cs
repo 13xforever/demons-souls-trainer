@@ -92,7 +92,7 @@ static unsafe class Program
                                 if (!string.IsNullOrEmpty(name))
                                     name += " ";
                                 
-                                Console.Write($"\x1B[G{name}\x1B[91m❤️{hp} \x1B[94m🔵{mp} \x1B[92m🟩{st} \x1B[0m👻{souls}       ");
+                                Console.Write($"\e[G{name}\e[91m❤️{hp} \e[94m🔵{mp} \e[92m🟩{st} \e[0m👻{souls}       ");
                             }
                         }
                     }
@@ -133,14 +133,14 @@ static unsafe class Program
                 PrivilegeCount = 1,
                 Privileges = new()
                 {
-                    _0 = new()
+                    e0 = new()
                     {
                         Luid = luid,
                         Attributes = TOKEN_PRIVILEGES_ATTRIBUTES.SE_PRIVILEGE_ENABLED,
                     }
                 }
             };
-            PInvoke.AdjustTokenPrivileges(htok, false, tp, 0, default, default);
+            PInvoke.AdjustTokenPrivileges(htok, false, &tp, 0, default, default);
         }
         catch (Exception ex)
         {
