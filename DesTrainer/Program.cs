@@ -74,7 +74,7 @@ static unsafe class Program
                             var hp = BinaryPrimitives.ReadUInt32BigEndian(valBuf[4..]);
                             var mp = BinaryPrimitives.ReadUInt32BigEndian(valBuf[12..]);
                             var st = BinaryPrimitives.ReadUInt32BigEndian(valBuf[20..]);
-                            if (hp < 9999 && mp < 9999 & st < 9999)
+                            if (hp < 9999 && mp < 9999 && st < 9999)
                             {
                                 valBuf[4..8].CopyTo(valBuf[0..4]);
                                 valBuf[12..16].CopyTo(valBuf[8..12]);
