@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers;
 using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -10,19 +9,20 @@ using System.Text;
 using System.Threading;
 using Windows.Win32;
 using Windows.Win32.Security;
+using Microsoft.Win32.SafeHandles;
 
 namespace DesTrainer;
 
 [SupportedOSPlatform("windows6.0")]
-static unsafe class Program
+internal static unsafe class Program
 {
-    const int ValueLength = 2*3*4;
-    const char ESC = '\u001B';
+    private const int ValueLength = 2*3*4;
 
-    static void Main(string[] args)
+    private static void Main(string[] args)
     {
         AdjustPrivileges();
 
+        Console.OutputEncoding = Encoding.UTF8;
         Console.Clear();
         Console.WindowWidth = 50;
         Console.WindowHeight = 5;
@@ -113,17 +113,17 @@ static unsafe class Program
             else
                 Thread.Sleep(1000);
         } while (true);
+        // ReSharper disable once FunctionNeverReturns
     }
 
     private static void AdjustPrivileges()
     {
         try
         {
-            var hproc = Process.GetCurrentProcess().SafeHandle;
             PInvoke.OpenProcessToken(
-                hproc,
+                Process.GetCurrentProcess().SafeHandle,
                 TOKEN_ACCESS_MASK.TOKEN_ADJUST_PRIVILEGES | TOKEN_ACCESS_MASK.TOKEN_QUERY,
-                out var htok
+                out var tokenHandle
             );
             if (!PInvoke.LookupPrivilegeValue(null, PInvoke.SE_DEBUG_NAME, out var luid))
                 throw new UnauthorizedAccessException();
@@ -140,7 +140,7 @@ static unsafe class Program
                     }
                 }
             };
-            PInvoke.AdjustTokenPrivileges(htok, false, &tp, 0, default, default);
+            PInvoke.AdjustTokenPrivileges(tokenHandle, false, &tp, out _);
         }
         catch (Exception ex)
         {

@@ -29,9 +29,7 @@ public unsafe class ProcessMemoryReader: IDisposable
     public void ReadProcessMemory(IntPtr address, uint bytesToRead, Span<byte> buffer, out uint bytesRead)
     {
         var changedProtection = PInvoke.VirtualProtectEx(procHandle, (void*)address, bytesToRead, PAGE_PROTECTION_FLAGS.PAGE_EXECUTE_READWRITE, out var originalProtection);
-        UIntPtr lpBytesRead = default;
-        fixed (void* lpBuffer = buffer)
-            PInvoke.ReadProcessMemory(procHandle, (void*)address, lpBuffer, bytesToRead, &lpBytesRead);
+        PInvoke.ReadProcessMemory(procHandle, (void*)address, buffer, out var lpBytesRead);
         if (changedProtection)
             PInvoke.VirtualProtectEx(procHandle, (void*)address, bytesToRead, originalProtection, out _);
         bytesRead = lpBytesRead.ToUInt32();
@@ -39,22 +37,19 @@ public unsafe class ProcessMemoryReader: IDisposable
 
     public void WriteProcessMemory(IntPtr address, Span<byte> bytesToWrite, out uint bytesWritten)
     {
-        UIntPtr lpBytesWritten = default;
-        fixed (void* lpBytesToWrite = bytesToWrite)
-            PInvoke.WriteProcessMemory(procHandle, (void*)address, lpBytesToWrite, (uint)bytesToWrite.Length, &lpBytesWritten);
+        PInvoke.WriteProcessMemory(procHandle, (void*)address, bytesToWrite, out var lpBytesWritten);
         bytesWritten = lpBytesWritten.ToUInt32();
     }
 
     public List<(ulong offset, ulong length)> GetMemoryRegions()
     {
         var result = new List<(ulong offset, ulong length)>();
-        var regions = new HashSet<(ulong offset, ulong length)>();
         UIntPtr queryResult;
         ulong offset = 0;
         do
         {
-            queryResult = PInvoke.VirtualQueryEx(procHandle, (void*)offset, out var memInfo, (UIntPtr)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION)));
-            var allocationBase = (ulong)memInfo.AllocationBase;
+            queryResult = PInvoke.VirtualQueryEx(procHandle, (void*)offset, out var memInfo);
+            //var allocationBase = (ulong)memInfo.AllocationBase;
             var baseAddress = (ulong)memInfo.BaseAddress;
             var regionSize = (ulong)memInfo.RegionSize;
             var newOffset = baseAddress + regionSize;
