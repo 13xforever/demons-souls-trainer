@@ -140,7 +140,7 @@ internal static unsafe class Program
                     }
                 }
             };
-            PInvoke.AdjustTokenPrivileges(tokenHandle, false, &tp, out _);
+            PInvoke.AdjustTokenPrivileges(tokenHandle, false, &tp, default, out _);
         }
         catch (Exception ex)
         {
